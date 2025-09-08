@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>論理回路ドラッグ教材｜フリーモード＋クイズ（安定版）</title>
+<title>論理回路ドラッグ教材｜フリー & クイズ 統合版</title>
 <style>
   :root{ --neon:#ccff00; --grid:#e5e7eb; --panel:#0b1324; --ink:#e5e7eb; }
   *{box-sizing:border-box}
@@ -33,7 +33,7 @@
   #wires{position:absolute;inset:0;width:100%;height:100%;z-index:1;overflow:visible}
   #wires path{pointer-events:stroke;stroke:#60a5fa;stroke-width:4;fill:none;opacity:.95}
   #wires path.selected{stroke:var(--neon);stroke-width:5;opacity:1;filter:drop-shadow(0 0 4px rgba(204,255,0,.6))}
-  .hint{position:absolute;top:10px;left:12px;background:rgba(2,6,23,.72);border:1px solid #0b1220;backdrop-filter:blur(6px);padding:8px 10px;border-radius:10px;font-size:12px;color:#cbd5e1;max-width:min(900px,85vw);z-index:3}
+  .hint{position:absolute;top:10px;left:12px;background:rgba(2,6,23,.72);border:1px solid #0b1220;backdrop-filter:blur(6px);padding:8px 10px;border-radius:10px;font-size:12px;color:#cbd5e1;max-width:min(980px,85vw);z-index:3}
 
   .node{position:absolute;min-width:96px;background:#0b1324;border:1px solid #384152;border-radius:14px;box-shadow:0 10px 25px rgba(0,0,0,.3);user-select:none;z-index:2}
   .node.selected{outline:2px solid #6366f1}
@@ -56,7 +56,17 @@
   /* 右パネル */
   #viz{background:#111827;border-left:1px solid #1f2937;padding:12px;overflow:auto}
   #viz .cap{font-size:12px;color:#cbd5e1;margin-top:8px}
+  #vennWrap{position:relative}
   #venn{display:block;margin:6px auto 0;background:#0b1324;border:1px dashed #374151;border-radius:10px}
+  #truthOverlay{position:absolute;inset:auto 8px 8px 8px; top:8px; background:rgba(2,6,23,.92); border:1px solid #374151; border-radius:10px; padding:10px; display:none; z-index:5}
+  #truthOverlay .t-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  #truthOverlay .t-title{font-weight:800;font-size:13px}
+  #truthOverlay .t-close{cursor:pointer;border:1px solid #475569;background:#0b1324;color:#e5e7eb;border-radius:8px;padding:4px 6px;font-size:12px}
+  table.truth{width:100%;border-collapse:collapse;font-size:12px}
+  table.truth th, table.truth td{border:1px solid #374151;padding:4px 6px;text-align:center}
+  table.truth th{background:#0f172a}
+  table.truth tr:nth-child(even) td{background:#0c1426}
+
   #guide{margin-top:14px}
   #guide h2{font-size:13px;margin:0 0 8px;color:#9ca3af}
   .guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -101,6 +111,7 @@
     <div class="item" data-type="NAND"><div class="xgate"></div>NAND</div>
     <div style="margin-top:10px;color:#9ca3af;font-size:12px;line-height:1.6">
       <b>配線</b> 出力ピン（右）→入力ピン（左）の順にクリック。<br>
+      <b>接続/解除</b> 端子→端子をもう一度クリックで線をトグル。ピンのダブルクリックでも解除。<br>
       <b>削除</b> ノード選択→Delete/Backspace。線はクリック選択→Delete/Backspace、またはダブルクリック。<br>
       <b>移動</b> ノード上部バーをドラッグ（ESCで接続キャンセル）。<br>
       <b>クリック追加</b> パレットをクリックでも中央に追加できます。
@@ -109,11 +120,18 @@
   <main id="stage-wrap">
     <div id="stage"></div>
     <svg id="wires"></svg>
-    <div id="hint" class="hint">フリーモード：A/B/C を配線して LED（Out）に接続すると、右上にベン図（赤ハッチ）で出力領域を描画。LEDが2つある場合は上下2分割。端子→端子の順クリックで**接続/解除（トグル）**、ピンのダブルクリックでも解除できます。クイズに切替で、黄緑（問題）と赤ハッチ（あなたの回路）を重ねて確認。</div>
+    <div id="hint" class="hint">フリーモード：A/B/C を配線して LED（Out）に接続すると、右上にベン図（赤ハッチ）で出力領域を描画。LEDが2つある場合は上下2分割。端子→端子の順クリックで<strong>接続/解除（トグル）</strong>、ピンのダブルクリックでも解除できます。クイズに切替で、黄緑（問題）と赤ハッチ（あなたの回路）を重ねて確認。</div>
   </main>
   <aside id="viz">
     <div style="font-size:13px;color:#9ca3af;margin:8px 0 6px">ベン図（Out=1の領域）</div>
-    <canvas id="venn" width="280" height="280"></canvas>
+    <div id="vennWrap">
+      <canvas id="venn" width="280" height="280"></canvas>
+      <div id="truthOverlay">
+        <div class="t-head"><div class="t-title">真理値表</div><button id="btnTruthClose" class="t-close">閉じる</button></div>
+        <div id="truthBody"></div>
+      </div>
+    </div>
+    <div style="margin-top:6px"><button class="btn" id="btnTruth">真理値表</button></div>
     <div id="vennCaption" class="cap">LEDを接続するとベン図に斜線で表示します（フリーモード）</div>
 
     <div id="guide">
@@ -206,21 +224,12 @@
     // 端子→端子の順クリックで接続/解除（トグル）
     const matches=[];
     wires.forEach(w=>{
-      if(w.from.id===from.nodeId && w.from.out===from.outIndex && w.to.id===to.nodeId && w.to.in===to.inIndex){
-        matches.push(w.id);
-      }
+      if(w.from.id===from.nodeId && w.from.out===from.outIndex && w.to.id===to.nodeId && w.to.in===to.inIndex){ matches.push(w.id); }
     });
-    if(matches.length){
-      matches.forEach(id=>removeWire(id));
-      refreshLinkedPins(); updateStatus(); simulate();
-      return; // 既存の線を削除して終了
-    }
+    if(matches.length){ matches.forEach(id=>removeWire(id)); refreshLinkedPins(); updateStatus(); simulate(); return; }
     // 新規追加
-    const id=(WIRE_ID++).toString();
-    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.dataset.id=id; svg.appendChild(path);
-    const w={id,el:path,from:{id:from.nodeId,out:from.outIndex},to:{id:to.nodeId,in:to.inIndex}};
-    wires.set(id,w);
+    const id=(WIRE_ID++).toString(); const path=document.createElementNS('http://www.w3.org/2000/svg','path'); path.dataset.id=id; svg.appendChild(path);
+    const w={id,el:path,from:{id:from.nodeId,out:from.outIndex},to:{id:to.nodeId,in:to.inIndex}}; wires.set(id,w);
     path.addEventListener('click',e=>{ selectWire(id); e.stopPropagation(); });
     path.addEventListener('dblclick',e=>{ removeWire(id); e.stopPropagation(); });
     redrawWire(w); refreshLinkedPins(); updateStatus(); simulate();
@@ -310,40 +319,40 @@
 
   // ====== クイズ定義（送付順） ======
   const quizzes={
-    1:{ title:'Q1：同じなら1（AとBが等しい）', explain:'AとBが同じときOut=1、違うときOut=0。推奨 ≤ 2', rec:2, vars:2, spec:function(a,b){return (a===b);} },
-    2:{ title:'Q2：1つだけ1', explain:'AとBのうち1つだけが1のときOut=1。推奨 ≤ 1', rec:1, vars:2, spec:function(a,b){return ((a^b)===1);} },
-    3:{ title:'Q3：両方1のときだけ0', explain:'AとBが両方1ならOut=0、それ以外は1（NAND）', rec:1, vars:2, spec:function(a,b){return !(a&&b);} },
-    4:{ title:'Q4：A=1かつB=0', explain:'Aが1でBが0のときOut=1。推奨 ≤ 2', rec:2, vars:2, spec:function(a,b){return (a && !b);} },
-    5:{ title:'Q5：C=1のときだけ(AまたはB)', explain:'C=1のときだけ(A OR B)が1ならOut=1。推奨 ≤ 2', rec:2, vars:3, spec:function(a,b,c){return (c && (a||b));} },
-    6:{ title:'Q6：AとBが違い かつ C=1', explain:'(A XOR B) かつ C=1 でOut=1。推奨 ≤ 2', rec:2, vars:3, spec:function(a,b,c){return (c && ((a^b)===1));} },
-    7:{ title:'Q7：どちらかが1なら0', explain:'AまたはBが1なら0、両方0で1（NOR）', rec:2, vars:2, spec:function(a,b){return !(a||b);} },
-    8:{ title:'Q8：ONの数が偶数（A,B,C）', explain:'A,B,Cのうち1の数が偶数ならOut=1。推奨 ≤ 3', rec:3, vars:3, spec:function(a,b,c){return ((a^b^c)===0);} }
+    1:{ title:'Q1：同じなら1（AとBが等しい）', explain:'AとBが同じときOut=1、違うときOut=0。推奨 ≤ 2', rec:2, vars:2, spec:(a,b)=> (a===b) },
+    2:{ title:'Q2：1つだけ1', explain:'AとBのうち1つだけが1のときOut=1。推奨 ≤ 1', rec:1, vars:2, spec:(a,b)=> ((a^b)===1) },
+    3:{ title:'Q3：両方1のときだけ0', explain:'AとBが両方1ならOut=0、それ以外は1（NAND）', rec:1, vars:2, spec:(a,b)=> !(a&&b) },
+    4:{ title:'Q4：A=1かつB=0', explain:'Aが1でBが0のときOut=1。推奨 ≤ 2', rec:2, vars:2, spec:(a,b)=> (a && !b) },
+    5:{ title:'Q5：C=1のときだけ(AまたはB)', explain:'C=1のときだけ(A OR B)が1ならOut=1。推奨 ≤ 2', rec:2, vars:3, spec:(a,b,c)=> (c && (a||b)) },
+    6:{ title:'Q6：AとBが違い かつ C=1', explain:'(A XOR B) かつ C=1 でOut=1。推奨 ≤ 2', rec:2, vars:3, spec:(a,b,c)=> (c && ((a^b)===1)) },
+    7:{ title:'Q7：どちらかが1なら0', explain:'AまたはBが1なら0、両方0で1（NOR）', rec:2, vars:2, spec:(a,b)=> !(a||b) },
+    8:{ title:'Q8：ONの数が偶数（A,B,C）', explain:'A,B,Cのうち1の数が偶数ならOut=1。推奨 ≤ 3', rec:3, vars:3, spec:(a,b,c)=> ((a^b^c)===0) }
   };
   let currentQuizId=null;
 
   function f(label){ for(const n of nodes.values()){ if(n.el.querySelector('.head span').textContent.trim()===label) return n; } return null; }
-  function truthCheck(toggles, leds, fn){ const save=toggles.map(function(t){return !!t.value;}); let ok=true, firstErr=null; const N=toggles.length; for(let m=0;m<(1<<N);m++){ for(let i=0;i<N;i++){ toggles[i].value=!!((m>>i)&1); } simulateInternal(); const inVals=toggles.map(function(t){return !!t.value;}); const exp=!!fn.apply(null,inVals.map(function(v){return v?1:0;})); const act=!!leds[0].value; if(act!==exp && ok){ ok=false; firstErr={inVals:inVals,exp:exp,act:act}; } } save.forEach(function(v,i){ toggles[i].value=v; }); simulateInternal(); if(ok) return {ok:true,msg:'合格！すべて正しい出力です。'}; const bits=firstErr.inVals.map(function(v){return v?1:0;}).join(''); return {ok:false,msg:'不合格：入力('+bits+')で 期待='+(firstErr.exp?1:0)+' / 実際='+(firstErr.act?1:0)}; }
+  function truthCheck(toggles, leds, fn){ const save=toggles.map(t=>!!t.value); let ok=true, firstErr=null; const N=toggles.length; for(let m=0;m<(1<<N);m++){ for(let i=0;i<N;i++){ toggles[i].value=!!((m>>i)&1); } simulateInternal(); const inVals=toggles.map(t=>!!t.value); const exp=!!fn(...inVals.map(v=>v?1:0)); const act=!!leds[0].value; if(act!==exp && ok){ ok=false; firstErr={inVals,exp,act}; } } save.forEach((v,i)=>{ toggles[i].value=v; }); simulateInternal(); if(ok) return {ok:true,msg:'合格！すべて正しい出力です。'}; const bits=firstErr.inVals.map(v=>v?1:0).join(''); return {ok:false,msg:`不合格：入力(${bits})で 期待=${firstErr.exp?1:0} / 実際=${firstErr.act?1:0}`}; }
 
-  document.querySelectorAll('.btn.quiz').forEach(function(btn){ btn.addEventListener('click',function(){
+  document.querySelectorAll('.btn.quiz').forEach(btn=>btn.addEventListener('click',()=>{
     if(mode!=='quiz') setMode('quiz');
     // 押したら一旦リセット
     clearAll();
-    document.querySelectorAll('.btn.quiz').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelectorAll('.btn.quiz').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     currentQuizId=btn.getAttribute('data-quiz');
     const q=quizzes[currentQuizId];
-    quizTitleEl.textContent=q.title; hintEl.textContent=q.explain + '（推奨ゲート≤'+q.rec+'）';
+    quizTitleEl.textContent=q.title; hintEl.textContent=q.explain + `（推奨ゲート≤${q.rec}）`;
     renderVennById(currentQuizId);
-  }); });
+  }));
 
-  document.getElementById('btnCheck').addEventListener('click',function(){
+  document.getElementById('btnCheck').addEventListener('click',()=>{
     if(mode!=='quiz'){ hintEl.textContent='まず「クイズ」タブに切り替えてください。'; return; }
     if(!currentQuizId){ hintEl.textContent='クイズ番号を選んでください。'; return; }
     const q=quizzes[currentQuizId];
     const need=['A','B','C'].slice(0,q.vars);
     const tgs=need.map(f);
     const out=f('Out')||f('OUT');
-    if(tgs.some(function(x){return !x;})||!out){ hintEl.textContent='A,B(,C) と Out を配置して接続してください。'; return; }
+    if(tgs.some(x=>!x)||!out){ hintEl.textContent='A,B(,C) と Out を配置して接続してください。'; return; }
     const res=truthCheck(tgs,[out],q.spec);
     hintEl.textContent=(res.ok?'✅ ':'❌ ')+res.msg;
     renderVennById(currentQuizId);
@@ -391,34 +400,101 @@
   }
 
   function findByLabel(label){ for(const n of nodes.values()){ const t=n.el.querySelector('.head span').textContent.trim(); if(t===label) return n; } return null; }
-  function listConnectedLEDs(){ const list=[]; nodes.forEach(function(n){ if(n.type==='led'){ const connected=[...wires.values()].some(function(w){return w.to.id===n.id;}); if(connected) list.push(n); } }); return list; }
+  function listConnectedLEDs(){ const list=[]; nodes.forEach(n=>{ if(n.type==='led'){ const connected=[...wires.values()].some(w=> w.to.id===n.id); if(connected) list.push(n); } }); return list; }
+
+  // ★ 上流トグルだけを対象にして評価（3集合時の崩れ対策）
+  function getUpstreamToggles(ledNode){
+    const picked = {A:null, B:null, C:null};
+    const seen = new Set();
+    function dfs(nodeId){
+      if(seen.has(nodeId)) return; seen.add(nodeId);
+      wires.forEach(w=>{
+        if(w.to.id===nodeId){
+          const src=nodes.get(w.from.id); if(!src) return;
+          if(src.type==='toggle'){
+            const label = src.el.querySelector('.head span').textContent.trim();
+            if((label==='A'||label==='B'||label==='C') && !picked[label]) picked[label]=src;
+          }else{ dfs(src.id); }
+        }
+      });
+    }
+    dfs(ledNode.id);
+    return ['A','B','C'].map(k=>picked[k]).filter(Boolean);
+  }
+
+  function buildOverlayFor(ledNode){
+    const tgs = getUpstreamToggles(ledNode);
+    const vars = Math.min(3, Math.max(2, tgs.length));
+    function evalFor(a,b,c){
+      const bits=[a,b,c];
+      const save=tgs.map(t=>t.value);
+      tgs.forEach((t,i)=>{ t.value=!!bits[i]; });
+      simulateInternal();
+      const v=!!ledNode.value;
+      tgs.forEach((t,i)=>{ t.value=save[i]; });
+      simulateInternal();
+      return v?1:0;
+    }
+    return {vars, fn:(a,b,c)=>evalFor(a,b,c)};
+  }
 
   // フリーモードのベン図
-  function buildOverlayFor(ledNode){
-    const toggles=['A','B','C'].map(findByLabel).filter(Boolean);
-    const vars=toggles.length || 2;
-    function evalFor(a,b,c){ const save=toggles.map(function(t){return t.value;}); const vals=[a,b,c]; toggles.forEach(function(t,i){ t.value=!!vals[i]; }); simulateInternal(); const v=!!ledNode.value; toggles.forEach(function(t,i){ t.value=save[i]; }); simulateInternal(); return v?1:0; }
-    return {vars:vars, fn:function(a,b,c){ return evalFor(a,b,c); }};
+  function renderVennFree(){
+    const leds=listConnectedLEDs(); const rects=getRectsForLEDs(leds.length||1);
+    const ctx=venn.getContext('2d'); ctx.clearRect(0,0,venn.width,venn.height);
+    if(leds.length===0){ drawVenn({vars:2,fn:()=>false}, venn, null); return; }
+    leds.slice(0,2).forEach((led,i)=>{ const overlay=buildOverlayFor(led); drawVenn(null, venn, overlay, rects[i]); });
   }
-  function renderVennFree(){ const leds=listConnectedLEDs(); const rects=getRectsForLEDs(leds.length||1); const ctx=venn.getContext('2d'); ctx.clearRect(0,0,venn.width,venn.height); if(leds.length===0){ drawVenn({vars:2,fn:function(){return false;}}, venn, null); return; } leds.slice(0,2).forEach(function(led,i){ const overlay=buildOverlayFor(led); drawVenn(null, venn, overlay, rects[i]); }); }
 
   // クイズのベン図
-  function renderVennById(id){ const leds=listConnectedLEDs(); const rects=getRectsForLEDs(leds.length||1); const ctx=venn.getContext('2d'); ctx.clearRect(0,0,venn.width,venn.height); if(!id){ drawVenn({vars:2,fn:function(){return false;}},venn,null); return; } const q=quizzes[id]; if(!q){ return; } const overlay=(leds[0])? buildOverlayFor(leds[0]) : null; drawVenn({vars:q.vars, fn:q.spec}, venn, overlay, rects[0]); if(leds.length>1){ const overlay2=buildOverlayFor(leds[1]); drawVenn({vars:q.vars, fn:q.spec}, venn, overlay2, rects[1]); } }
+  function renderVennById(id){
+    const leds=listConnectedLEDs(); const rects=getRectsForLEDs(leds.length||1);
+    const ctx=venn.getContext('2d'); ctx.clearRect(0,0,venn.width,venn.height);
+    if(!id){ drawVenn({vars:2,fn:()=>false},venn,null); return; }
+    const q=quizzes[id]; if(!q) return;
+    const overlay=(leds[0])? buildOverlayFor(leds[0]) : null;
+    drawVenn({vars:q.vars, fn:q.spec}, venn, overlay, rects[0]);
+    if(leds.length>1){ const overlay2=buildOverlayFor(leds[1]); drawVenn({vars:q.vars, fn:q.spec}, venn, overlay2, rects[1]); }
+  }
 
   // ====== ガイド描画 ======
   function gc(id){ return document.getElementById(id).getContext('2d'); }
   function drawGuideTwo(ctx, pred){ const w=ctx.canvas.width, h=ctx.canvas.height; const G=regionsFor(w,h,2); function inside(P,x,y){ const dx=x-P.x, dy=y-P.y; return (dx*dx+dy*dy)<=P.r*P.r; } ctx.clearRect(0,0,w,h); ctx.lineWidth=2; ctx.strokeStyle='#e5e7eb'; ctx.fillStyle='rgba(204,255,0,0.55)'; for(let y=0;y<h;y+=1){ for(let x=0;x<w;x+=1){ const a=inside(G.A,x,y), b=inside(G.B,x,y); if(pred(a?1:0,b?1:0)){ ctx.fillRect(x,y,1,1); } } } ctx.beginPath(); ctx.arc(G.A.x,G.A.y,G.A.r,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(G.B.x,G.B.y,G.B.r,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='#cbd5e1'; ctx.font='12px system-ui'; ctx.fillText('A', G.A.x-6, G.A.y-G.A.r-6); ctx.fillText('B', G.B.x-6, G.B.y-G.B.r-6); }
-  function drawGuideAND(){ const ctx=gc('gAND'); drawGuideTwo(ctx,function(a,b){ return a&&b; }); }
-  function drawGuideOR(){ const ctx=gc('gOR'); drawGuideTwo(ctx,function(a,b){ return a||b; }); }
-  function drawGuideXOR(){ const ctx=gc('gXOR'); drawGuideTwo(ctx,function(a,b){ return (a^b)===1; }); }
-  function drawGuideNAND(){ const ctx=gc('gNAND'); drawGuideTwo(ctx,function(a,b){ return !(a&&b); }); }
+  function drawGuideAND(){ const ctx=gc('gAND'); drawGuideTwo(ctx,(a,b)=> a&&b ); }
+  function drawGuideOR(){ const ctx=gc('gOR'); drawGuideTwo(ctx,(a,b)=> a||b ); }
+  function drawGuideXOR(){ const ctx=gc('gXOR'); drawGuideTwo(ctx,(a,b)=> (a^b)===1 ); }
+  function drawGuideNAND(){ const ctx=gc('gNAND'); drawGuideTwo(ctx,(a,b)=> !(a&&b) ); }
   function drawGuideNOT(){ const ctx=gc('gNOT'); const w=ctx.canvas.width, h=ctx.canvas.height; const G=regionsFor(w,h,2); function inside(P,x,y){ const dx=x-P.x, dy=y-P.y; return (dx*dx+dy*dy)<=P.r*P.r; } ctx.clearRect(0,0,w,h); ctx.lineWidth=2; ctx.strokeStyle='#e5e7eb'; ctx.fillStyle='rgba(204,255,0,0.55)'; for(let y=0;y<h;y+=1){ for(let x=0;x<w;x+=1){ const a=inside(G.A,x,y); if(!a){ ctx.fillRect(x,y,1,1); } } } ctx.beginPath(); ctx.arc(G.A.x,G.A.y,G.A.r,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(G.B.x,G.B.y,G.B.r,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='#cbd5e1'; ctx.font='12px system-ui'; ctx.fillText('A', G.A.x-6, G.A.y-G.A.r-6); ctx.fillText('B', G.B.x-6, G.B.y-G.B.r-6); }
   function drawGuideAll(){ drawGuideAND(); drawGuideOR(); drawGuideXOR(); drawGuideNAND(); drawGuideNOT(); }
 
   // ====== 初期化 ======
   drawGuideAll();
-  drawVenn({vars:2, fn:function(){return false;}}, venn, null);
+  drawVenn({vars:2, fn:()=>false}, venn, null);
   setMode('free');
+
+  // ====== 真理値表（Venn 上にオーバーレイ） ======
+  const btnTruth=document.getElementById('btnTruth');
+  const truthOverlay=document.getElementById('truthOverlay');
+  const truthBody=document.getElementById('truthBody');
+  const btnTruthClose=document.getElementById('btnTruthClose');
+  let truthShown=false;
+  function canShowTruth(){ if(mode==='free') return listConnectedLEDs().length>0; if(mode==='quiz') return !!currentQuizId; return false; }
+  function evalOverlayFn(overlay, bits){ const a=bits[0]||0, b=bits[1]||0, c=bits[2]||0; return overlay.fn(a,b,c); }
+  function buildTruthData(){
+    if(mode==='free'){
+      const leds=listConnectedLEDs(); if(leds.length===0) return null; const ov=buildOverlayFor(leds[0]); const vars=ov.vars||2; const rows=[]; const N=vars; for(let m=0;m<(1<<N);m++){ const bits=[(m>>0)&1,(m>>1)&1,(m>>2)&1]; const out=evalOverlayFn(ov,bits); rows.push({bits:bits.slice(0,N), out:out}); } return {vars:N, rows, cols:['回路']};
+    } else {
+      if(!currentQuizId) return null; const q=quizzes[currentQuizId]; const N=q.vars; const leds=listConnectedLEDs(); const ov = (leds[0])? buildOverlayFor(leds[0]) : null; const rows=[]; for(let m=0;m<(1<<N);m++){ const bits=[(m>>0)&1,(m>>1)&1,(m>>2)&1]; const exp=q.spec(bits[0],bits[1],bits[2]); const out=ov? evalOverlayFn(ov,bits) : null; rows.push({bits:bits.slice(0,N), exp:exp, out:out}); } return {vars:N, rows, cols: ov? ['問題','回路'] : ['問題']};
+    }
+  }
+  function renderTruth(){ const data=buildTruthData(); if(!data){ truthOverlay.style.display='none'; truthShown=false; return; } let html='<table class="truth"><thead><tr>'; const N=data.vars; const labels=['A','B','C']; for(let i=0;i<N;i++){ html+='<th>'+labels[i]+'</th>'; } data.cols.forEach(c=>{ html+='<th>'+c+'</th>'; }); html+='</tr></thead><tbody>'; data.rows.forEach(r=>{ html+='<tr>'; r.bits.forEach(b=>{ html+='<td>'+b+'</td>'; }); if('exp' in r){ html+='<td>'+(r.exp?1:0)+'</td>'; } if('out' in r){ if(r.out!==null && r.out!==undefined) html+='<td>'+(r.out?1:0)+'</td>'; } html+='</tr>'; }); html+='</tbody></table>'; truthBody.innerHTML=html; truthOverlay.style.display='block'; truthShown=true; }
+  function hideTruth(){ truthOverlay.style.display='none'; truthShown=false; }
+  function toggleTruth(){ if(truthShown) hideTruth(); else { if(canShowTruth()){ renderTruth(); } } }
+  btnTruth.addEventListener('click',toggleTruth);
+  btnTruthClose.addEventListener('click',hideTruth);
+  // Venn 再描画のたびに、オーバーレイ表示中なら中身を再計算
+  const _renderVennFree = renderVennFree; renderVennFree = function(){ _renderVennFree(); if(truthShown) renderTruth(); };
+  const _renderVennById = renderVennById; renderVennById = function(id){ _renderVennById(id); if(truthShown) renderTruth(); };
 })();
 </script>
 </body>
