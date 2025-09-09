@@ -54,7 +54,9 @@
   .led.on{background:radial-gradient(circle at 50% 35%,#ff6d6d,#b91c1c 60%,#7f1d1d);box-shadow:0 0 18px rgba(239,68,68,.55),inset 0 0 10px rgba(255,255,255,.25)}
 
   /* 右パネル */
-  #viz{background:#111827;border-left:1px solid #1f2937;padding:12px;overflow:auto}
+  #viz{background:#111827;border-left:1px solid #1f2937;padding:12px;overflow:auto
+  position: relative;
+}
   #viz .cap{font-size:12px;color:#cbd5e1;margin-top:8px}
   #vennWrap{position:relative}
   #venn{display:block;margin:6px auto 0;background:#0b1324;border:1px dashed #374151;border-radius:10px}
@@ -76,6 +78,14 @@
 
   footer{height:40px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 12px;border-top:1px solid #1f2937;background:#0b1220;font-size:12px;color:#cbd5e1}
   #quizBar{display:none;gap:6px;flex-wrap:wrap}
+
+  /* === Custom tweaks (Sept 2025) === */
+  #btnTruth{ background:#E4E24C !important; color:#111827 !important; border-color:#c9c73a !important; }
+  #btnTruth:hover{ filter:brightness(0.95); }
+  #truthOverlay .t-switch{ display:none; align-items:center; gap:6px; }
+  #truthOverlay .t-tab{ border:1px solid #475569; background:#0b1324; color:#e5e7eb; border-radius:8px; padding:4px 8px; font-size:12px; cursor:pointer; }
+  #truthOverlay .t-tab.active{ background:#E4E24C; color:#111827; border-color:#c9c73a; }
+
 </style>
 </head>
 <body>
@@ -103,7 +113,7 @@
   <aside id="palette">
     <div style="font-size:13px;color:#9ca3af;margin:8px 0 6px">パレット（ドラッグしてキャンバスへ）</div>
     <div class="item" data-type="toggle"><div class="xgate"></div>トグル</div>
-    <div class="item" data-type="led"><div class="xgate"></div>LED</div>
+    <div class="item" data-type="led"><div class="xgate"></div>OUT(出力端子)</div>
     <div class="item" data-type="NOT"><div class="xgate"></div>NOT</div>
     <div class="item" data-type="OR"><div class="xgate"></div>OR</div>
     <div class="item" data-type="AND"><div class="xgate"></div>AND</div>
@@ -127,7 +137,7 @@
     <div id="vennWrap">
       <canvas id="venn" width="280" height="280"></canvas>
       <div id="truthOverlay">
-        <div class="t-head"><div class="t-title">真理値表</div><button id="btnTruthClose" class="t-close">閉じる</button></div>
+        <div class="t-head"><div class="t-title">真理値表</div><div class="t-switch" id="truthSwitch"><button class="t-tab active" data-idx="0">上</button><button class="t-tab" data-idx="1">下</button></div><button id="btnTruthClose" class="t-close">閉じる</button></div>
         <div id="truthBody"></div>
       </div>
     </div>
@@ -319,8 +329,8 @@
 
   // ====== クイズ定義（送付順） ======
   const quizzes={
-    1:{ title:'Q1：同じなら1（AとBが等しい）', explain:'AとBが同じときOut=1、違うときOut=0。推奨 ≤ 2', rec:2, vars:2, spec:(a,b)=> (a===b) },
-    2:{ title:'Q2：1つだけ1', explain:'AとBのうち1つだけが1のときOut=1。推奨 ≤ 1', rec:1, vars:2, spec:(a,b)=> ((a^b)===1) },
+    1:{ title:'Q2：1つだけ1', explain:'AとBのうち1つだけが1のときOut=1。推奨 ≤ 1', rec:1, vars:2, spec:(a,b)=> ((a^b)===1) },
+    2:{ title:'Q1：同じなら1（AとBが等しい）', explain:'AとBが同じときOut=1、違うときOut=0。推奨 ≤ 2', rec:2, vars:2, spec:(a,b)=> (a===b) },
     3:{ title:'Q3：両方1のときだけ0', explain:'AとBが両方1ならOut=0、それ以外は1（NAND）', rec:1, vars:2, spec:(a,b)=> !(a&&b) },
     4:{ title:'Q4：A=1かつB=0', explain:'Aが1でBが0のときOut=1。推奨 ≤ 2', rec:2, vars:2, spec:(a,b)=> (a && !b) },
     5:{ title:'Q5：C=1のときだけ(AまたはB)', explain:'C=1のときだけ(A OR B)が1ならOut=1。推奨 ≤ 2', rec:2, vars:3, spec:(a,b,c)=> (c && (a||b)) },
@@ -361,11 +371,33 @@
   // ====== ベン図描画 ======
   const venn=document.getElementById('venn');
   function regionsFor(w,h,vars){
-    // A/B は必ず交差する幾何に固定、C は下段に配置
-    const r2=Math.min(h*0.36, w*0.24);
-    const A2={x:w*0.38,y:h*0.5,r:r2}, B2={x:w*0.62,y:h*0.5,r:r2};
-    const r3=Math.min(w,h)*0.24;
-    const A3={x:w*0.37,y:h*0.42,r:r3}, B3={x:w*0.63,y:h*0.42,r:r3}, C3={x:w*0.50,y:h*0.72,r:r3};
+    // --- Venn配置（重なりを深め、必ず交差させる） ---
+    // 2集合: A,B を左右に置いて十分に重ねる
+    let r2 = Math.min(h*0.36, w*0.24);
+    const cx2 = w*0.50, cy2 = h*0.50;
+    let dx2 = Math.min(w*0.28, r2*1.6);
+    const overlapPix2 = Math.max(12, r2*0.30); // ← 重なり量（大きめ）
+    if (dx2 >= 2*r2 - overlapPix2) dx2 = 2*r2 - overlapPix2;
+    const A2 = {x:cx2 - dx2/2, y:cy2, r:r2};
+    const B2 = {x:cx2 + dx2/2, y:cy2, r:r2};
+
+    // 3集合: 下段に B/C を水平、上段に A。すべての組が交差
+    const cx = w*0.50;
+    const bottomY0 = h*0.66;
+    let r3 = Math.min(w,h) * 0.22;
+    let dx = Math.min(w*0.28, r3*1.5);
+    const overlapPix = Math.max(14, r3*0.32); // ← 重なり量（大きめ）
+    if (dx >= 2*r3 - overlapPix) dx = 2*r3 - overlapPix;
+    let dy = Math.min(h*0.26, r3*1.5);
+    if (dy >= 2*r3 - overlapPix) dy = 2*r3 - overlapPix;
+
+    const bottomY = bottomY0;
+    const topY    = bottomY - dy;
+
+    const B3 = {x:cx - dx/2, y:bottomY, r:r3};
+    const C3 = {x:cx + dx/2, y:bottomY, r:r3};
+    const A3 = {x:cx,         y:topY,    r:r3};
+
     return (vars===3)? {A:A3,B:B3,C:C3} : {A:A2,B:B2};
   }
   function getRectsForLEDs(n){ const W=venn.width, H=venn.height; if(n<=1) return [{x:0,y:0,w:W,h:H}]; const gap=10; const hh=(H-gap)/2; return [{x:0,y:0,w:W,h:hh},{x:0,y:hh+gap,w:W,h:hh}]; }
@@ -391,11 +423,36 @@
       ctx.fillStyle = isOverlay ? hatchFill : fillExpect; const step=1, period=8, thick=3;
       for(let y=0;y<h;y+=step){ for(let x=0;x<w;x+=step){ if(evalAt(S,x,y)){ if(!isOverlay || ((x+y)%period<thick)) ctx.fillRect(x,y,step,step); } } }
     }
-    // 輪郭
-    ctx.fillStyle='#cbd5e1'; ctx.font='12px system-ui';
-    ctx.beginPath(); ctx.arc(G.A.x,G.A.y,G.A.r,0,Math.PI*2); ctx.stroke(); ctx.fillText('A', G.A.x-6, G.A.y-G.A.r-6);
-    ctx.beginPath(); ctx.arc(G.B.x,G.B.y,G.B.r,0,Math.PI*2); ctx.stroke(); ctx.fillText('B', G.B.x-6, G.B.y-G.B.r-6);
-    if(gvars===3){ ctx.beginPath(); ctx.arc(G.C.x,G.C.y,G.C.r,0,Math.PI*2); ctx.stroke(); ctx.fillText('C', G.C.x-6, G.C.y-G.C.r-6); }
+    // 輪郭（円）
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(G.A.x,G.A.y,G.A.r,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(G.B.x,G.B.y,G.B.r,0,Math.PI*2); ctx.stroke();
+    if(gvars===3){ ctx.beginPath(); ctx.arc(G.C.x,G.C.y,G.C.r,0,Math.PI*2); ctx.stroke(); }
+    // ラベルは円の外側へ
+    drawVennLabels(ctx, G);
+    ctx.restore();
+  }
+  // 円の外側にラベル（A/B/C）を描く
+  function drawVennLabels(ctx, R){
+    ctx.save();
+    ctx.fillStyle = 'rgba(229,231,235,0.95)';
+    ctx.font = 'bold 14px system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    const offY = 10;       // 円の外側（上方向）へのオフセット
+    const offX = 12;       // 3集合時に B/C を左右へ寄せる量
+    const isThree = !!R.C; // C がある => 3集合
+
+    if (R.A) ctx.fillText('A', R.A.x, R.A.y - R.A.r - offY);
+    if (R.B) {
+      const bx = isThree ? (R.B.x - offX) : R.B.x; // 左へずらす
+      ctx.fillText('B', bx, R.B.y - R.B.r - offY);
+    }
+    if (R.C) {
+      const cx = isThree ? (R.C.x + offX) : R.C.x; // 右へずらす
+      ctx.fillText('C', cx, R.C.y - R.C.r - offY);
+    }
     ctx.restore();
   }
 
@@ -424,18 +481,26 @@
 
   function buildOverlayFor(ledNode){
     const tgs = getUpstreamToggles(ledNode);
-    const vars = Math.min(3, Math.max(2, tgs.length));
+    // C が関与していれば必ず 3 集合を描く（C 単独・A∧C などでも C を明示）
+    const labels = tgs.map(t=> t.el.querySelector('.head span').textContent.trim());
+    const hasC = labels.includes('C');
+    const vars = hasC ? 3 : 2;
     function evalFor(a,b,c){
-      const bits=[a,b,c];
-      const save=tgs.map(t=>t.value);
-      tgs.forEach((t,i)=>{ t.value=!!bits[i]; });
+      // A/B/C それぞれの領域判定を、同名のトグルに正しく割り当てる
+      const want = { A: !!a, B: !!b, C: !!c };
+      const save = tgs.map(t=>t.value);
+      tgs.forEach(t=>{
+        const L = t.el.querySelector('.head span').textContent.trim();
+        t.value = !!want[L]; // 該当しない変数（未定義）は false 扱い
+      });
       simulateInternal();
-      const v=!!ledNode.value;
-      tgs.forEach((t,i)=>{ t.value=save[i]; });
+      const v = !!ledNode.value;
+      // 復元
+      tgs.forEach((t,i)=>{ t.value = save[i]; });
       simulateInternal();
       return v?1:0;
     }
-    return {vars, fn:(a,b,c)=>evalFor(a,b,c)};
+    return {vars, fn: (a,b,c)=>evalFor(a,b,c)};
   }
 
   // フリーモードのベン図
@@ -477,24 +542,184 @@
   const truthOverlay=document.getElementById('truthOverlay');
   const truthBody=document.getElementById('truthBody');
   const btnTruthClose=document.getElementById('btnTruthClose');
+  const truthSwitch=document.getElementById('truthSwitch');
+  let truthIndex=0; // 0=上, 1=下（OUTが2つある場合のみ）
   let truthShown=false;
   function canShowTruth(){ if(mode==='free') return listConnectedLEDs().length>0; if(mode==='quiz') return !!currentQuizId; return false; }
   function evalOverlayFn(overlay, bits){ const a=bits[0]||0, b=bits[1]||0, c=bits[2]||0; return overlay.fn(a,b,c); }
   function buildTruthData(){
+    const leds = listConnectedLEDs();
+    const overlays = leds.slice(0,2).map(led => buildOverlayFor(led));
+    const hasTwo = overlays.length >= 2;
+    // truthIndex を有効範囲に
+    if (truthIndex >= overlays.length) truthIndex = 0;
+
     if(mode==='free'){
-      const leds=listConnectedLEDs(); if(leds.length===0) return null; const ov=buildOverlayFor(leds[0]); const vars=ov.vars||2; const rows=[]; const N=vars; for(let m=0;m<(1<<N);m++){ const bits=[(m>>0)&1,(m>>1)&1,(m>>2)&1]; const out=evalOverlayFn(ov,bits); rows.push({bits:bits.slice(0,N), out:out}); } return {vars:N, rows, cols:['回路']};
+      if(overlays.length===0) return null;
+      const ov = overlays[truthIndex] || overlays[0];
+      const vars = ov.vars || 2;
+      const rows = [];
+      const N = vars;
+      for(let m=0;m<(1<<N);m++){
+        const bits=[(m>>0)&1,(m>>1)&1,(m>>2)&1];
+        const out=evalOverlayFn(ov,bits);
+        rows.push({bits:bits.slice(0,N), out:out});
+      }
+      return {vars:N, rows, cols:['回路'], numOutputs: overlays.length};
     } else {
-      if(!currentQuizId) return null; const q=quizzes[currentQuizId]; const N=q.vars; const leds=listConnectedLEDs(); const ov = (leds[0])? buildOverlayFor(leds[0]) : null; const rows=[]; for(let m=0;m<(1<<N);m++){ const bits=[(m>>0)&1,(m>>1)&1,(m>>2)&1]; const exp=q.spec(bits[0],bits[1],bits[2]); const out=ov? evalOverlayFn(ov,bits) : null; rows.push({bits:bits.slice(0,N), exp:exp, out:out}); } return {vars:N, rows, cols: ov? ['問題','回路'] : ['問題']};
+      if(!currentQuizId) return null;
+      const q=quizzes[currentQuizId];
+      const N=q.vars;
+      const ov = overlays.length ? overlays[truthIndex] : null;
+      const rows=[];
+      for(let m=0;m<(1<<N);m++){
+        const bits=[(m>>0)&1,(m>>1)&1,(m>>2)&1];
+        const exp=q.spec(bits[0],bits[1],bits[2]);
+        const out=ov? evalOverlayFn(ov,bits) : null;
+        rows.push({bits:bits.slice(0,N), exp:exp, out:out});
+      }
+      return {vars:N, rows, cols: ov? ['問題','回路'] : ['問題'], numOutputs: overlays.length};
     }
   }
-  function renderTruth(){ const data=buildTruthData(); if(!data){ truthOverlay.style.display='none'; truthShown=false; return; } let html='<table class="truth"><thead><tr>'; const N=data.vars; const labels=['A','B','C']; for(let i=0;i<N;i++){ html+='<th>'+labels[i]+'</th>'; } data.cols.forEach(c=>{ html+='<th>'+c+'</th>'; }); html+='</tr></thead><tbody>'; data.rows.forEach(r=>{ html+='<tr>'; r.bits.forEach(b=>{ html+='<td>'+b+'</td>'; }); if('exp' in r){ html+='<td>'+(r.exp?1:0)+'</td>'; } if('out' in r){ if(r.out!==null && r.out!==undefined) html+='<td>'+(r.out?1:0)+'</td>'; } html+='</tr>'; }); html+='</tbody></table>'; truthBody.innerHTML=html; truthOverlay.style.display='block'; truthShown=true; }
+  function renderTruth(){
+    const data=buildTruthData();
+    if(!data){ truthOverlay.style.display='none'; truthShown=false; if(truthSwitch) truthSwitch.style.display='none'; return; }
+    // 上下切り替えの可視/選択状態
+    if(truthSwitch){
+      if(data.numOutputs && data.numOutputs>=2){
+        truthSwitch.style.display='flex';
+        const tabs = truthSwitch.querySelectorAll('.t-tab');
+        tabs.forEach((b,i)=> b.classList.toggle('active', i===Math.min(truthIndex, data.numOutputs-1)));
+      }else{
+        truthSwitch.style.display='none';
+        truthIndex = 0;
+      }
+    }
+    let html='<table class="truth"><thead><tr>';
+    const N=data.vars; const labels=['A','B','C'];
+    for(let i=0;i<N;i++){ html+='<th>'+labels[i]+'</th>'; }
+    data.cols.forEach(c=>{ html+='<th>'+c+'</th>'; });
+    html+='</tr></thead><tbody>';
+    data.rows.forEach(r=>{
+      html+='<tr>';
+      r.bits.forEach(b=>{ html+='<td>'+b+'</td>'; });
+      if('exp' in r){ html+='<td>'+(r.exp?1:0)+'</td>'; }
+      if('out' in r){ if(r.out!==null && r.out!==undefined) html+='<td>'+(r.out?1:0)+'</td>'; }
+      html+='</tr>';
+    });
+    html+='</tbody></table>';
+    truthBody.innerHTML=html;
+    if (window.__truth_overlay__) { window.__truth_overlay__.relocateTruth(); window.__truth_overlay__.placeTruth(); }
+    truthOverlay.style.display='block';
+    truthShown=true;
+  }
   function hideTruth(){ truthOverlay.style.display='none'; truthShown=false; }
   function toggleTruth(){ if(truthShown) hideTruth(); else { if(canShowTruth()){ renderTruth(); } } }
   btnTruth.addEventListener('click',toggleTruth);
   btnTruthClose.addEventListener('click',hideTruth);
+  if(truthSwitch){
+    truthSwitch.addEventListener('click', (e)=>{
+      const t = e.target.closest('.t-tab');
+      if(!t) return;
+      const idx = parseInt(t.dataset.idx||'0',10);
+      truthIndex = isNaN(idx)?0:idx;
+      // active 見た目更新
+      truthSwitch.querySelectorAll('.t-tab').forEach((b,i)=> b.classList.toggle('active', i===truthIndex));
+      renderTruth();
+    });
+  }
   // Venn 再描画のたびに、オーバーレイ表示中なら中身を再計算
   const _renderVennFree = renderVennFree; renderVennFree = function(){ _renderVennFree(); if(truthShown) renderTruth(); };
   const _renderVennById = renderVennById; renderVennById = function(id){ _renderVennById(id); if(truthShown) renderTruth(); };
+})();
+</script>
+
+<script>
+// === Truth Overlay positional helpers (non-invasive) ===
+(function(){
+  try{
+    const viz = document.getElementById('viz');
+    const btnTruth = document.getElementById('btnTruth');
+    const truthOverlay = document.getElementById('truthOverlay');
+
+    if(!viz || !btnTruth || !truthOverlay) return;
+
+    function relocateTruth(){
+      // keep DOM order right after the button container, but parent stays within #viz
+      const wrap = btnTruth.parentElement || btnTruth;
+      if (truthOverlay.previousElementSibling !== wrap) {
+        wrap.insertAdjacentElement('afterend', truthOverlay);
+      }
+    }
+
+    function placeTruth(){
+      const wrap = btnTruth.parentElement || btnTruth;
+      // position relative to #viz (which is position:relative)
+      const top = wrap.offsetTop + wrap.offsetHeight + 6; // just below button row
+      truthOverlay.style.top = top + 'px';
+      // ensure it overlays instead of stretching to bottom if bottom was set in CSS
+      truthOverlay.style.bottom = 'auto';
+    }
+
+    // expose for other code (renderTruth) to call
+    window.__truth_overlay__ = { relocateTruth, placeTruth };
+
+    // initial pass
+    relocateTruth();
+    window.addEventListener('resize', ()=> {
+      if (truthOverlay && truthOverlay.style.display !== 'none') placeTruth();
+    });
+  }catch(e){ console.warn(e); }
+})();
+</script>
+<script>
+// === Truth Overlay precise alignment: top just under the button, no overlap ===
+(function(){
+  try{
+    const viz = document.getElementById('viz');
+    const btnTruth = document.getElementById('btnTruth');
+    const truthOverlay = document.getElementById('truthOverlay');
+    if(!viz || !btnTruth || !truthOverlay) return;
+
+    function relocateTruth2(){
+      if (truthOverlay.parentElement !== viz) viz.appendChild(truthOverlay);
+    }
+    function placeTruth2(){
+      const vb = viz.getBoundingClientRect();
+      const bb = btnTruth.getBoundingClientRect();
+      const top = Math.max(0, Math.round(bb.bottom - vb.top + 6 + 113.385827 + 75.590551)); // 6px margin under button
+      truthOverlay.style.top = top + 'px';
+      truthOverlay.style.bottom = 'auto';
+    }
+
+    // Expose / override global helper
+    window.__truth_overlay__ = { relocateTruth: relocateTruth2, placeTruth: placeTruth2 };
+
+    // Hook renderTruth once (non-invasive)
+    if (typeof window.renderTruth === 'function' && !window.__tt_wrapped__){
+      const _orig = window.renderTruth;
+      window.renderTruth = function(){
+        const ret = _orig.apply(this, arguments);
+        relocateTruth2();
+        placeTruth2();
+        return ret;
+      };
+      window.__tt_wrapped__ = true;
+    }
+
+    // On click, (re)place after visibility toggles
+    btnTruth.addEventListener('click', ()=> setTimeout(()=>{ 
+      if (truthOverlay.style.display !== 'none') { relocateTruth2(); placeTruth2(); }
+    }, 0));
+
+    // Reposition on resize
+    window.addEventListener('resize', ()=>{ 
+      if (truthOverlay && truthOverlay.style.display !== 'none') placeTruth2();
+    });
+
+    // Initial pass if already visible
+    if (truthOverlay.style.display !== 'none'){ relocateTruth2(); placeTruth2(); }
+  }catch(e){ console.warn(e); }
 })();
 </script>
 </body>
